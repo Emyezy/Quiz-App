@@ -1,4 +1,17 @@
-const questions = [
+const startButton = document.getElementById("start-btn");
+const nextButton = document.getElementById("next-btn");
+const restartButton = document.getElementById("restart-btn");
+const questionContainer = document.getElementById("question-container");
+const questionElement = document.getElementById("question");
+const answerButtonsElement = document.getElementById("answer-buttons");
+const scoreContainer = document.getElementById("score-container");
+const scoreElement = document.getElementById("score");
+
+let shuffledQuestions, currentQuestionIndex;
+let score = 0;
+
+// Custom Nigeria Questions (first 10)
+const nigeriaQuestions = [
   {
     question: "What is the capital of Nigeria?",
     answers: [
@@ -9,21 +22,22 @@ const questions = [
     ],
   },
   {
-    question: "What is 20 + 25?",
+    question: "Which Nigerian artist sang African Queen?",
     answers: [
-      { text: "65", correct: false },
-      { text: "85", correct: false },
-      { text: "55", correct: false },
-      { text: "45", correct: true },
+      { text: "Davido", correct: false },
+      { text: "Burna Boy", correct: false },
+      { text: "Wizkid", correct: false },
+      { text: "2Face Idibia", correct: true },
     ],
   },
   {
-    question: "Which planet is known as the Hottest?",
+    question:
+      "Which Nigerian writer won the Nobel Prize in Literature in 1986?",
     answers: [
-      { text: "Earth", correct: false },
-      { text: "Mars", correct: false },
-      { text: "Venus", correct: true },
-      { text: "Saturn", correct: false },
+      { text: "Ben Okri", correct: false },
+      { text: "Chinua Achebe", correct: false },
+      { text: "Wole Soyinka", correct: true },
+      { text: "Chimamanda Ngozi Adichie", correct: false },
     ],
   },
   {
@@ -36,13 +50,12 @@ const questions = [
     ],
   },
   {
-    question:
-      "What is the melting point of ice at standard atmospheric pressure?",
+    question: "The currency used in Nigeria is",
     answers: [
-      { text: "0 °C (32 °F)", correct: true },
-      { text: "50 °C (122 °F)", correct: false },
-      { text: "–10 °C (14 °F)", correct: false },
-      { text: "100 °C (212 °F)", correct: false },
+      { text: "Naira", correct: true },
+      { text: "Cedi", correct: false },
+      { text: "Pound", correct: false },
+      { text: "Dollar", correct: false },
     ],
   },
   {
@@ -66,94 +79,144 @@ const questions = [
   {
     question: "In which year did Nigeria gain independence?",
     answers: [
+      { text: "1945", correct: false },
+      { text: "1947", correct: false },
       { text: "1960", correct: true },
-      { text: "1990", correct: false },
-      { text: "1950", correct: false },
-      { text: "1919", correct: false },
+      { text: "1952", correct: false },
+    ],
+  },
+  {
+    question: "Which river is the longest in Nigeria?",
+    answers: [
+      { text: "River Benue", correct: false },
+      { text: "River Kaduna", correct: false },
+      { text: "River Niger", correct: true },
+      { text: "River Cross", correct: false },
+    ],
+  },
+  {
+    question: "Who designed the Nigerian flag?",
+    answers: [
+      { text: "Dora Akunyili", correct: false },
+      { text: "Yakubu Gowon", correct: false },
+      { text: "Michael Taiwo Akinkunmi", correct: true },
+      { text: "Wole Soyinka", correct: false },
     ],
   },
 ];
 
-const questionElement = document.getElementById("question");
-const answerButtons = document.getElementById("answer-buttons");
-const nextButton = document.getElementById("next-btn");
-const restartButton = document.getElementById("restart-btn");
-const restartButton2 = document.getElementById("restart-btn2");
-const quizContainer = document.getElementById("quiz-container");
-const resultContainer = document.getElementById("result-container");
-const scoreText = document.getElementById("score");
-
-let currentQuestionIndex = 0;
-let score = 0;
-
-function startQuiz() {
-  currentQuestionIndex = 0;
-  score = 0;
-  quizContainer.classList.remove("hidden");
-  resultContainer.classList.add("hidden");
-  showQuestion();
+// Fetch 90 questions from Open Trivia
+async function fetchTriviaQuestions() {
+  const res = await fetch(
+    "https://opentdb.com/api.php?amount=90&type=multiple"
+  );
+  const data = await res.json();
+  return data.results.map((q) => ({
+    question: decodeHTML(q.question),
+    answers: shuffleArray([
+      ...q.incorrect_answers.map((ans) => ({
+        text: decodeHTML(ans),
+        correct: false,
+      })),
+      { text: decodeHTML(q.correct_answer), correct: true },
+    ]),
+  }));
 }
 
-function showQuestion() {
-  resetState();
-  let currentQuestion = questions[currentQuestionIndex];
-  questionElement.textContent = currentQuestion.question;
+function decodeHTML(html) {
+  var txt = document.createElement("textarea");
+  txt.innerHTML = html;
+  return txt.value;
+}
 
-  currentQuestion.answers.forEach((answer) => {
+function shuffleArray(array) {
+  return array.sort(() => Math.random() - 0.5);
+}
+
+startButton.addEventListener("click", startGame);
+nextButton.addEventListener("click", () => {
+  currentQuestionIndex++;
+  setNextQuestion();
+});
+restartButton.addEventListener("click", () => {
+  window.location.reload();
+});
+
+async function startGame() {
+  startButton.classList.add("hide");
+  score = 0;
+  // Load custom + API questions
+  const apiQuestions = await fetchTriviaQuestions();
+  shuffledQuestions = [...nigeriaQuestions, ...apiQuestions];
+  currentQuestionIndex = 0;
+  questionContainer.classList.remove("hide");
+  setNextQuestion();
+}
+
+function setNextQuestion() {
+  resetState();
+  if (currentQuestionIndex < shuffledQuestions.length) {
+    showQuestion(shuffledQuestions[currentQuestionIndex]);
+  } else {
+    endQuiz();
+  }
+}
+
+function showQuestion(question) {
+  questionElement.innerText = question.question;
+  question.answers.forEach((answer) => {
     const button = document.createElement("button");
     button.innerText = answer.text;
     button.classList.add("btn");
-    button.addEventListener("click", () => selectAnswer(answer, button));
-    answerButtons.appendChild(button);
+    if (answer.correct) {
+      button.dataset.correct = answer.correct;
+    }
+    button.addEventListener("click", selectAnswer);
+    answerButtonsElement.appendChild(button);
   });
 }
 
 function resetState() {
-  nextButton.style.display = "none";
-  while (answerButtons.firstChild) {
-    answerButtons.removeChild(answerButtons.firstChild);
+  clearStatusClass(document.body);
+  nextButton.classList.add("hide");
+  while (answerButtonsElement.firstChild) {
+    answerButtonsElement.removeChild(answerButtonsElement.firstChild);
   }
 }
 
-function selectAnswer(answer, button) {
-  const correct = answer.correct;
-  if (correct) {
-    button.classList.add("correct");
-    score++;
-  } else {
-    button.classList.add("wrong");
-  }
-
-  Array.from(answerButtons.children).forEach((btn) => {
-    btn.disabled = true;
-    if (
-      btn.innerText ===
-      questions[currentQuestionIndex].answers.find((a) => a.correct).text
-    ) {
-      btn.classList.add("correct");
-    }
+function selectAnswer(e) {
+  const selectedButton = e.target;
+  const correct = selectedButton.dataset.correct === "true";
+  if (correct) score++;
+  setStatusClass(selectedButton, correct);
+  Array.from(answerButtonsElement.children).forEach((button) => {
+    setStatusClass(button, button.dataset.correct === "true");
+    button.disabled = true;
   });
-
-  nextButton.style.display = "block";
-}
-
-function showResult() {
-  quizContainer.classList.add("hidden");
-  resultContainer.classList.remove("hidden");
-  scoreText.textContent = `${score} / ${questions.length}`;
-}
-
-nextButton.addEventListener("click", () => {
-  currentQuestionIndex++;
-  if (currentQuestionIndex < questions.length) {
-    showQuestion();
+  if (currentQuestionIndex < shuffledQuestions.length - 1) {
+    nextButton.classList.remove("hide");
   } else {
-    showResult();
+    endQuiz();
   }
-});
+}
 
-restartButton.addEventListener("click", startQuiz);
-restartButton2.addEventListener("click", startQuiz);
+function endQuiz() {
+  questionContainer.classList.add("hide");
+  scoreContainer.classList.remove("hide");
+  scoreElement.innerText = score;
+  restartButton.classList.remove("hide");
+}
 
-// Start the quiz initially
-startQuiz();
+function setStatusClass(element, correct) {
+  clearStatusClass(element);
+  if (correct) {
+    element.classList.add("correct");
+  } else {
+    element.classList.add("wrong");
+  }
+}
+
+function clearStatusClass(element) {
+  element.classList.remove("correct");
+  element.classList.remove("wrong");
+}
